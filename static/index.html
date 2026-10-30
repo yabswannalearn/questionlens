@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f5ef">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>Question Lens</title>
+  <link rel="manifest" href="/static/manifest.webmanifest?v=9">
+  <link rel="stylesheet" href="/static/style.css?v=15">
+</head>
+<body>
+  <main class="shell">
+    <header class="header">
+      <div class="brand"><span class="brand-mark">✳</span><span>QUESTION LENS</span></div>
+      <button id="rotateLandscape" class="rotate-button" type="button" hidden>↻ Landscape</button>
+      <button id="focus" class="focus-button" type="button" aria-pressed="false">Full screen <span aria-hidden="true">⛶</span></button>
+    </header>
+
+    <section class="intro">
+      <p class="eyebrow"><span class="dot"></span> YOUR STUDY SESSION</p>
+      <h1>Ready when<br><em>you are.</em></h1>
+      <p class="intro-copy">Point your camera at one question. We’ll take it from there.</p>
+    </section>
+
+    <section class="viewfinder" aria-label="Camera preview">
+      <video id="camera" autoplay muted playsinline></video>
+      <div class="viewfinder-shade"></div>
+      <div class="viewfinder-top"><span><span class="live-dot"></span> LIVE VIEW</span><span>01 / 01</span></div>
+      <div class="frame"><i></i><i></i><i></i><i></i><span id="frameText">YOUR QUESTION HERE</span></div>
+      <div class="viewfinder-bottom">KEEP THE QUESTION &amp; CHOICES IN VIEW <span>↗</span></div>
+    </section>
+
+    <p class="rotate-hint" role="status">↻ Turn your phone sideways for landscape</p>
+
+    <div class="zoom-control">
+      <button id="zoomToggle" class="zoom-toggle" type="button" aria-controls="zoomPanel" aria-expanded="false" hidden>1.0×</button>
+      <div id="zoomPanel" class="zoom-panel" hidden>
+        <div class="zoom-heading"><label for="zoomRange">Zoom</label><output id="zoomValue" for="zoomRange">1.0×</output></div>
+        <input id="zoomRange" type="range" min="1" max="4" step="0.1" value="1" aria-label="Camera zoom">
+        <div class="zoom-limits"><span>1×</span><span>4×</span></div>
+      </div>
+    </div>
+
+    <div class="camera-action"><button id="start" class="primary">Start camera <span>↗</span></button></div>
+    <div class="manual-action">
+      <button id="pollToggle" class="poll-toggle" type="button" hidden>Stop polling</button>
+      <button id="scanNow" class="manual-scan" type="button" hidden>Scan now <span aria-hidden="true">↗</span></button>
+    </div>
+
+    <section class="result" aria-live="polite">
+      <div class="result-top"><span class="eyebrow">THE ANSWER</span><span id="step" class="step">STANDBY</span></div>
+      <div id="status" class="status">Start the camera to begin scanning.</div>
+      <div id="answers" class="answers"></div>
+      <button id="retry" class="retry" hidden>Try again <span>↗</span></button>
+      <details class="ocr-reading">
+        <summary>View OCR reading</summary>
+        <p>The latest reading from Google Cloud Vision.</p>
+        <pre id="ocrText">No text recognized yet.</pre>
+      </details>
+    </section>
+    <footer><span>ONE QUESTION AT A TIME</span><span>MADE FOR YOUR NEXT MILESTONE ✳</span></footer>
+  </main>
+  <script type="module" src="/static/app.js?v=14"></script>
+</body>
+</html>
