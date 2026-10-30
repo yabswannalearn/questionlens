@@ -8,15 +8,26 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <title>Question Lens</title>
   <link rel="manifest" href="/static/manifest.webmanifest?v=9">
-  <link rel="stylesheet" href="/static/style.css?v=16">
+  <link rel="stylesheet" href="/static/style.css?v=25">
 </head>
 <body>
   <main class="shell">
     <header class="header">
       <div class="brand"><span class="brand-mark">✳</span><span>QUESTION LENS</span></div>
+      <button id="settingsButton" class="settings-button" type="button" aria-controls="settingsPanel" aria-expanded="false" aria-label="Settings">⚙</button>
       <button id="rotateLandscape" class="rotate-button" type="button" hidden>↻ Landscape</button>
       <button id="focus" class="focus-button" type="button" aria-pressed="false">Full screen <span aria-hidden="true">⛶</span></button>
     </header>
+
+    <section id="settingsPanel" class="settings-panel" role="dialog" aria-labelledby="settingsTitle" hidden>
+      <div class="settings-header"><h2 id="settingsTitle">Settings</h2><button id="closeSettings" type="button" aria-label="Close settings">✕</button></div>
+      <label for="pollSeconds">Polling interval (seconds)</label>
+      <input id="pollSeconds" type="number" min="1" max="300" step="1" value="15" inputmode="numeric">
+      <p>Choose 1–300 seconds.</p>
+      <label for="landscapeFirst">First landscape direction</label>
+      <select id="landscapeFirst"><option value="left">Left, then right</option><option value="right">Right, then left</option></select>
+      <p>The third press returns to portrait.</p>
+    </section>
 
     <section class="intro">
       <p class="eyebrow"><span class="dot"></span> YOUR STUDY SESSION</p>
@@ -34,17 +45,17 @@
 
     <p class="rotate-hint" role="status">↻ Turn your phone sideways for landscape</p>
 
-    <div class="zoom-control">
-      <button id="zoomToggle" class="zoom-toggle" type="button" aria-controls="zoomPanel" aria-expanded="false" hidden>1.0×</button>
-      <div id="zoomPanel" class="zoom-panel" hidden>
-        <div class="zoom-heading"><label for="zoomRange">Zoom</label><output id="zoomValue" for="zoomRange">1.0×</output></div>
-        <input id="zoomRange" type="range" min="1" max="4" step="0.1" value="1" aria-label="Camera zoom">
-        <div class="zoom-limits"><span>1×</span><span>4×</span></div>
+    <div class="camera-action"><button id="start" class="primary">Start camera <span>↗</span></button></div>
+    <div id="zoomControl" class="zoom-control" hidden>
+      <button id="zoomToggle" class="zoom-toggle" type="button" aria-controls="zoomSlider" aria-expanded="false" aria-label="Open zoom slider">1.0×</button>
+      <div id="zoomSlider" class="zoom-slider" hidden>
+        <output id="zoomValue" for="zoomRange" aria-hidden="true">1.0×</output>
+        <input id="zoomRange" type="range" min="1" max="4" step="0.1" value="1" aria-label="Camera zoom" aria-valuetext="1.0×">
+        <span id="zoomHint" class="zoom-hint">0.5× unavailable</span>
       </div>
     </div>
-
-    <div class="camera-action"><button id="start" class="primary">Start camera <span>↗</span></button></div>
     <div class="manual-action">
+      <span id="pollCountdown" class="poll-countdown" hidden></span>
       <button id="pollToggle" class="poll-toggle" type="button" hidden>Start polling</button>
       <button id="scanNow" class="manual-scan" type="button" hidden>Scan now <span aria-hidden="true">↗</span></button>
     </div>
@@ -62,6 +73,6 @@
     </section>
     <footer><span>ONE QUESTION AT A TIME</span><span>MADE FOR YOUR NEXT MILESTONE ✳</span></footer>
   </main>
-  <script type="module" src="/static/app.js?v=16"></script>
+  <script type="module" src="/static/app.js?v=25"></script>
 </body>
 </html>
