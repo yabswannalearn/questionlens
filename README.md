@@ -37,9 +37,11 @@ The default model is `gemini-3.5-flash-lite`. To use a different Gemini model av
 
 ## Use
 
-Place the phone on its tripod, point it at one complete question and all its choices, and press **Start camera**. Keep the pointer outside the question. The phone checks the camera view every 15 seconds and sends selected snapshots for Cloud Vision OCR, without overlapping requests. A visible change triggers a new OCR request; an unchanged view is not repeatedly sent, except when the last reading was incomplete. Tap **Scan now** to take and process a snapshot without waiting for the next automatic check; if a scan is in progress, one manual scan runs immediately afterward. A readable new question is sent to Gemini after a single OCR reading. If Gemini fails, the app automatically retries up to five times, then offers a Retry button. A matching question answered earlier in the current page session reuses its answer.
+Place the phone on its tripod, point it at one complete question and all its choices, and press **Start camera**. Polling starts off: tap **Start polling** when ready, or use **Scan now** for a single scan. Keep the pointer outside the question. While polling is on, the phone checks the camera view every 15 seconds and sends selected snapshots for Cloud Vision OCR, without overlapping requests. A visible change triggers a new OCR request; an unchanged view is not repeatedly sent, except when the last reading was incomplete. Tap **Scan now** to take and process a snapshot without waiting for the next automatic check; if a scan is in progress, one manual scan runs immediately afterward. A readable new question is sent to Gemini after a single OCR reading. If Gemini fails, the app automatically retries up to five times, then offers a Retry button. A matching question answered earlier in the current page session reuses its answer.
 
 Use **Stop polling** to stop automatic checks while leaving the camera and **Scan now** available. An OCR request already in progress can finish. Use **Start polling** to resume automatic checks.
+
+Answer letters follow the order of the choices: A is the first, B the second, and so on, even if the choices on screen have no letters. For multiple answers, the selected letters appear together above their answer text.
 
 Tap the **1.0×** control to open the zoom slider. Zoom is a digital crop, from 1× to 4×, so it cannot add detail beyond what the camera captured. The visible camera region, including the zoom, is sent for OCR.
 

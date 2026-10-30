@@ -220,6 +220,12 @@ function frameFingerprint(area) {
 
 function renderAnswer(data) {
   answers.replaceChildren();
+  if (data.choices.length > 1) {
+    const summary = document.createElement('div');
+    summary.className = 'answer-summary';
+    summary.textContent = data.choices.map(choice => choice.position).join(', ');
+    answers.append(summary);
+  }
   for (const choice of data.choices) {
     const row = document.createElement('div');
     row.className = 'answer';
@@ -433,12 +439,11 @@ startButton.addEventListener('click', async () => {
     scanning = true;
     scanNowButton.hidden = false;
     pollToggleButton.hidden = false;
+    pollToggleButton.textContent = 'Start polling';
     zoomToggle.hidden = false;
     startButton.textContent = 'Camera is running';
     document.body.classList.add('running');
-    showStatus('SCANNING', 'Keep the complete question and choices in view.');
-    startPolling();
-    scan();
+    showStatus('POLLING OFF', 'Tap Start polling or Scan now when you are ready.');
   } catch (error) {
     logEvent('camera_error');
     video.srcObject?.getTracks().forEach(track => track.stop());
