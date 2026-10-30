@@ -47,10 +47,13 @@
 .settings-button{border:1px solid #b8c9af;border-radius:3px;background:#213d30;color:#fff;min-width:34px;height:34px;font-size:19px;line-height:1;cursor:pointer}.focus-mode .settings-button{background:#17271fcc;border-color:#ffffff5c}.settings-panel{position:fixed;z-index:6;top:50%;left:50%;transform:translate(-50%,-50%);width:min(340px,90vw);max-height:85dvh;overflow:auto;padding:20px;border:1px solid #ffffff38;border-radius:12px;background:#13221df7;color:#fff;box-shadow:0 10px 40px #0008;text-align:left}.settings-panel[hidden]{display:none}.settings-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}.settings-header h2{margin:0;font-size:18px}.settings-header button{border:0;background:transparent;color:white;font-size:20px;cursor:pointer}.settings-panel label{display:block;margin:14px 0 6px;font-size:13px;font-weight:700}.settings-panel input,.settings-panel select{width:100%;min-height:40px;padding:8px;border:1px solid #b8c9af;border-radius:4px;background:#fff;color:#26382d;font:14px 'DM Sans',sans-serif}.settings-panel p{margin:6px 0;color:#c3d0c0;font-size:11px}.focus-mode:is(.controls-left,.controls-right) .settings-panel{width:min(360px,calc(100dvh - 40px));max-height:calc(100vw - 30px)}.focus-mode.controls-left .settings-panel{transform:translate(-50%,-50%) rotate(-90deg)}.focus-mode.controls-right .settings-panel{transform:translate(-50%,-50%) rotate(90deg)}
 .zoom-control{position:relative;left:auto;bottom:auto;margin:0 auto 8px;transform:none}
 .focus-mode .zoom-control{position:absolute;left:50%;bottom:calc(76px + env(safe-area-inset-bottom));margin:0;transform:translateX(-50%)}
-.focus-mode.vertical-zoom .zoom-control{left:auto;right:calc(14px + env(safe-area-inset-right));top:25%;bottom:auto;width:40px;transform:none}
-.focus-mode.vertical-zoom:is(.controls-left,.controls-right) .zoom-control{top:calc(10px + env(safe-area-inset-top))}
-.focus-mode.vertical-zoom .zoom-slider{left:auto;right:calc(100% + 12px);top:0;bottom:auto;width:64px;height:min(190px,calc(100dvh - 20px));padding:8px 4px}
+.focus-mode.vertical-zoom .zoom-control{left:calc(14px + env(safe-area-inset-left));right:auto;top:25%;bottom:auto;width:40px;transform:none}
+.focus-mode.vertical-zoom:is(.controls-left,.controls-right) .zoom-control{top:auto;bottom:calc(10px + env(safe-area-inset-bottom))}
+.focus-mode.vertical-zoom .zoom-slider{left:calc(100% + 12px);right:auto;top:0;bottom:auto;width:64px;height:min(190px,calc(100dvh - 20px));padding:8px 4px}
+.focus-mode.vertical-zoom:is(.controls-left,.controls-right) .zoom-slider{top:auto;bottom:0}
 .focus-mode.vertical-zoom .zoom-slider input{position:absolute;left:50%;top:50%;width:130px;height:30px;margin:0;transform:translate(-50%,-50%) rotate(-90deg)}
 .focus-mode.vertical-zoom .zoom-hint{position:absolute;bottom:5px;left:0;right:0}
-.focus-mode.controls-left .zoom-toggle,.focus-mode.controls-left .zoom-slider output{transform:rotate(-90deg)}
-.focus-mode.controls-right .zoom-toggle,.focus-mode.controls-right .zoom-slider output{transform:rotate(90deg)}
+.focus-mode.controls-left .zoom-toggle{transform:rotate(-90deg)}
+.focus-mode.controls-right .zoom-toggle{transform:rotate(90deg)}
+.focus-mode.vertical-zoom.controls-left .zoom-slider{top:0;bottom:auto;transform-origin:top left;transform:rotate(-90deg)}
+.focus-mode.vertical-zoom.controls-right .zoom-slider{left:calc(100% + 12px + min(190px,100dvh - 20px));top:-24px;bottom:auto;transform-origin:top left;transform:rotate(90deg)}

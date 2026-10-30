@@ -45,7 +45,7 @@ Open **Settings** with the gear button to change the polling interval (1–300 s
 
 Answer letters follow the order of the choices: A is the first, B the second, and so on, even if the choices on screen have no letters. For multiple answers, the selected letters appear together above their answer text.
 
-Tap the zoom button to open or close the slider, then drag it to adjust the camera view. The slider sits above the polling controls in portrait and vertically on the right in landscape. If the browser exposes a separately identifiable ultra-wide camera, the range starts at 0.5×; otherwise it starts at 1×. Between lens selections, zoom uses a digital crop and cannot add detail beyond what the camera captured. The visible camera region, including the zoom, is sent for OCR.
+Tap the zoom button to open or close the slider, then drag it to adjust the camera view. The slider sits above the polling controls in portrait and vertically on the left in landscape. If the browser exposes a separately identifiable ultra-wide camera, the range starts at 0.5×; otherwise it starts at 1×. Between lens selections, zoom uses a digital crop and cannot add detail beyond what the camera captured. The visible camera region, including the zoom, is sent for OCR.
 
 Each confirmed question sent to Gemini is saved in the local SQLite database `questions.sqlite3`, along with its timestamp, status, and Gemini answer when available. Retries update the same record. The session cache is cleared when the page reloads; the saved database history is not automatically reused. The database is excluded from Git.
 
