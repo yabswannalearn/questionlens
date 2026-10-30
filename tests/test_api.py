@@ -51,6 +51,28 @@ class AnswerApiTests(unittest.TestCase):
 
     @patch.dict(os.environ, {'GEMINI_API_KEY': 'test-key'}, clear=True)
     @patch('app.genai.Client')
+    def test_unlettered_choices_request_alphabetical_positions(self, client):
+        api = client.return_value.__enter__.return_value.models.generate_content
+        api.return_value = SimpleNamespace(text=json.dumps({'choices': [
+            {'position': 'A', 'text': 'First option'},
+            {'position': 'C', 'text': 'Third option'},
+        ]}))
+        question = {'text': 'Which two options are correct?\nFirst option\nSecond option\nThird option'}
+        response = self.client.post('/api/answer', json=question)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([choice['position'] for choice in response.json()['choices']], ['A', 'C'])
+        prompt = api.call_args.kwargs['contents']
+        self.assertIn('first A, second B, third C, fourth D', prompt)
+        self.assertIn('even when the choices on screen have no letters', prompt)
+        self.assertIn('each selected answer as a separate choice', prompt)
+
+    def test_choice_position_must_be_a_single_uppercase_letter(self):
+        for invalid in ('1', 'A, B', 'a', ''):
+            with self.subTest(position=invalid), self.assertRaises(ValueError):
+                app.Choice(position=invalid, text='Answer')
+
+    @patch.dict(os.environ, {'GEMINI_API_KEY': 'test-key'}, clear=True)
+    @patch('app.genai.Client')
     def test_provider_failure_does_not_expose_details(self, client):
         client.return_value.__enter__.return_value.models.generate_content.side_effect = RuntimeError('private provider details')
         response = self.client.post('/api/answer', json=self.question)

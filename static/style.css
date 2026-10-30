@@ -37,3 +37,5 @@
 .focus-mode.landscape-fallback .answer-label{min-width:56px;height:56px;font-size:32px}
 .focus-mode.landscape-fallback .manual-action{left:auto;right:18px;bottom:14px;width:min(340px,45%)}
 .focus-mode.landscape-fallback .poll-toggle,.focus-mode.landscape-fallback .manual-scan{padding:12px}
+.answer-summary{font-size:18px;font-weight:700;color:#3e5a3d}
+.focus-mode .answer-summary{color:#d5f79e;font-size:28px;text-align:center}

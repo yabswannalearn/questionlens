@@ -77,6 +77,17 @@ function setup(fetchImpl, useVisionGate = false, ocrImpl = null) {
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
 
+test('shows multiple selected letters together and keeps each answer text', () => {
+  const app = setup(() => {});
+  app.run(`renderAnswer({choices: [
+    {position: 'A', text: 'First answer'},
+    {position: 'C', text: 'Third answer'}
+  ]})`);
+  assert.equal(app.elements.answers.children[0].textContent, 'A, C');
+  assert.equal(app.elements.answers.children[1].children[1].textContent, 'First answer');
+  assert.equal(app.elements.answers.children[2].children[1].textContent, 'Third answer');
+});
+
 test('answers after one OCR reading and reuses earlier answers during the session', async () => {
   const requests = [];
   const app = setup(async (url, options) => {
@@ -271,15 +282,22 @@ test('manual requests during OCR queue one scan without overlapping', async () =
   assert.equal(maxActive, 1);
 });
 
-test('starts automatic polling at fifteen-second intervals', async () => {
+test('starts the camera with polling off and no OCR request', async () => {
   const app = setup(async () => ({ ok: true, json: async () => ({ choices: [] }) }));
-  app.queue.push(questionA);
   await app.elements.start.click();
   await settle();
-  assert.deepEqual(app.intervals, [15000]);
+  assert.deepEqual(app.intervals, []);
+  assert.equal(app.getOcrCalls(), 0);
   assert.equal(app.elements.scanNow.hidden, false);
   assert.equal(app.elements.pollToggle.hidden, false);
   assert.equal(app.elements.zoomToggle.hidden, false);
+  assert.equal(app.elements.pollToggle.textContent, 'Start polling');
+
+  app.queue.push(questionA);
+  app.elements.pollToggle.click();
+  await settle();
+  assert.deepEqual(app.intervals, [15000]);
+  assert.equal(app.getOcrCalls(), 1);
   assert.equal(app.elements.pollToggle.textContent, 'Stop polling');
 });
 
@@ -287,6 +305,7 @@ test('stopping polling leaves manual scans available and restarting creates one 
   const app = setup(async () => ({ ok: true, json: async () => ({ choices: [{ position: 'A', text: 'Answer' }] }) }));
   app.queue.push(questionA);
   await app.elements.start.click();
+  app.elements.pollToggle.click();
   await settle();
   assert.equal(app.activeIntervals.size, 1);
 
