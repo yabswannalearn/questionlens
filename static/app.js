@@ -2,6 +2,7 @@ const video = document.querySelector('#camera');
 const startButton = document.querySelector('#start');
 const scanNowButton = document.querySelector('#scanNow');
 const pollToggleButton = document.querySelector('#pollToggle');
+const pollCountdown = document.querySelector('#pollCountdown');
 const retryButton = document.querySelector('#retry');
 const statusText = document.querySelector('#status');
 const step = document.querySelector('#step');
@@ -9,11 +10,18 @@ const answers = document.querySelector('#answers');
 const frameText = document.querySelector('#frameText');
 const focusButton = document.querySelector('#focus');
 const rotateButton = document.querySelector('#rotateLandscape');
+const settingsButton = document.querySelector('#settingsButton');
+const settingsPanel = document.querySelector('#settingsPanel');
+const closeSettings = document.querySelector('#closeSettings');
+const pollSecondsInput = document.querySelector('#pollSeconds');
+const landscapeFirstInput = document.querySelector('#landscapeFirst');
 const ocrText = document.querySelector('#ocrText');
+const zoomControl = document.querySelector('#zoomControl');
 const zoomToggle = document.querySelector('#zoomToggle');
-const zoomPanel = document.querySelector('#zoomPanel');
+const zoomSlider = document.querySelector('#zoomSlider');
 const zoomRange = document.querySelector('#zoomRange');
 const zoomValue = document.querySelector('#zoomValue');
+const zoomHint = document.querySelector('#zoomHint');
 const canvas = document.createElement('canvas');
 const context = canvas.getContext('2d', { willReadFrequently: true });
 const thumbnail = document.createElement('canvas');
@@ -26,7 +34,6 @@ let currentScanId = '';
 let awaitingSceneCheck = false;
 let lastIncomplete = false;
 let lastImage = null;
-let lastOcrAt = 0;
 const sessionAnswers = new Map();
 let currentRequest;
 let generation = 0;
@@ -34,12 +41,61 @@ let scanning = false;
 let processing = false;
 let pendingManualScan = false;
 let pollingInterval = null;
+let countdownInterval = null;
+let nextPollAt = 0;
 let lastError = '';
 let lastAnswer = null;
 let waitingForAnswer = false;
 let digitalZoom = 1;
+let requestedZoom = 1;
+let standardDeviceId = null;
+let ultraWideDeviceId = null;
+let activeLens = 'standard';
+let cameraSwitching = false;
 let viewRevision = 0;
-let manualRotationRequest = 0;
+let controlsRotation = 0;
+let pollingSeconds = 15;
+let landscapeFirst = 'left';
+
+try {
+  const savedSeconds = Number(globalThis.localStorage?.getItem('questionlens.pollSeconds'));
+  if (Number.isInteger(savedSeconds) && savedSeconds >= 1 && savedSeconds <= 300) pollingSeconds = savedSeconds;
+  if (globalThis.localStorage?.getItem('questionlens.landscapeFirst') === 'right') landscapeFirst = 'right';
+} catch (_) { /* Settings remain usable for this page session. */ }
+pollSecondsInput.value = String(pollingSeconds);
+landscapeFirstInput.value = landscapeFirst;
+
+function saveSetting(key, value) {
+  try { globalThis.localStorage?.setItem(`questionlens.${key}`, String(value)); } catch (_) { /* Storage is optional. */ }
+}
+
+function showSettings(show) {
+  settingsPanel.hidden = !show;
+  settingsButton.setAttribute('aria-expanded', String(show));
+}
+
+settingsButton.addEventListener('click', () => showSettings(settingsPanel.hidden));
+closeSettings.addEventListener('click', () => showSettings(false));
+pollSecondsInput.addEventListener('change', () => {
+  const value = Number(pollSecondsInput.value);
+  if (!Number.isInteger(value) || value < 1 || value > 300) {
+    pollSecondsInput.value = String(pollingSeconds);
+    return;
+  }
+  if (value === pollingSeconds) return;
+  pollingSeconds = value;
+  saveSetting('pollSeconds', value);
+  if (pollingInterval !== null) {
+    stopPolling();
+    startPolling();
+  }
+});
+landscapeFirstInput.addEventListener('change', () => {
+  landscapeFirst = landscapeFirstInput.value === 'right' ? 'right' : 'left';
+  landscapeFirstInput.value = landscapeFirst;
+  saveSetting('landscapeFirst', landscapeFirst);
+  setControlsRotation(controlsRotation);
+});
 
 function logEvent(name, details = {}) {
   fetch('/api/events', {
@@ -52,81 +108,151 @@ function setFocusMode(enabled) {
   document.body.classList.toggle('focus-mode', enabled);
   rotateButton.hidden = !enabled;
   if (!enabled) {
-    manualRotationRequest++;
-    setLandscapeFallback(false);
+    setControlsRotation(0);
   }
+  updateZoomLayout();
   lastImage = null;
   viewRevision++;
   focusButton.setAttribute('aria-pressed', String(enabled));
   focusButton.textContent = enabled ? 'Exit full screen ↙' : 'Full screen ⛶';
 }
 
-function setLandscapeFallback(enabled) {
-  document.body.classList.toggle('landscape-fallback', enabled);
-  rotateButton.textContent = enabled ? '↺ Undo rotation' : '↻ Landscape';
-  lastImage = null;
-  viewRevision++;
+function setControlsRotation(rotation) {
+  controlsRotation = rotation;
+  document.body.classList.toggle('controls-left', rotation === 1);
+  document.body.classList.toggle('controls-right', rotation === 2);
+  updateZoomLayout();
+  const first = landscapeFirst === 'left' ? 1 : 2;
+  const next = rotation === 0 ? first : rotation === first ? 3 - first : 0;
+  rotateButton.setAttribute('aria-label', ['Return controls to portrait', 'Rotate controls left', 'Rotate controls right'][next]);
 }
 
-rotateButton.addEventListener('click', async () => {
+function updateZoomLayout() {
+  document.body.classList.toggle('vertical-zoom', document.body.classList.contains('focus-mode') &&
+    (controlsRotation !== 0 || globalThis.innerWidth > globalThis.innerHeight));
+}
+
+rotateButton.addEventListener('click', () => {
   if (!document.body.classList.contains('focus-mode')) return;
-  if (document.body.classList.contains('landscape-fallback')) {
-    manualRotationRequest++;
-    setLandscapeFallback(false);
-    return;
-  }
-  if (globalThis.innerWidth >= globalThis.innerHeight) return;
-  const request = ++manualRotationRequest;
-  try {
-    if (!globalThis.screen?.orientation?.lock) throw new Error('Orientation lock unavailable');
-    await globalThis.screen.orientation.lock('landscape');
-  } catch (_) {
-    if (request === manualRotationRequest && document.body.classList.contains('focus-mode') && globalThis.innerWidth < globalThis.innerHeight) {
-      setLandscapeFallback(true);
-    }
-  }
+  const first = landscapeFirst === 'left' ? 1 : 2;
+  setControlsRotation(controlsRotation === 0 ? first : controlsRotation === first ? 3 - first : 0);
 });
 
 globalThis.addEventListener?.('resize', () => {
   if (!document.body.classList.contains('focus-mode')) return;
-  if (document.body.classList.contains('landscape-fallback') && globalThis.innerWidth > globalThis.innerHeight) {
-    setLandscapeFallback(false);
-  } else {
-    lastImage = null;
-    viewRevision++;
-  }
-});
-
-zoomToggle.addEventListener('click', () => {
-  zoomPanel.hidden = !zoomPanel.hidden;
-  zoomToggle.setAttribute('aria-expanded', String(!zoomPanel.hidden));
-});
-
-zoomRange.addEventListener('input', () => {
-  digitalZoom = Math.max(1, Math.min(4, Number(zoomRange.value) || 1));
-  const label = `${digitalZoom.toFixed(1)}×`;
-  video.style.transform = `scale(${digitalZoom})`;
-  zoomValue.textContent = label;
-  zoomToggle.textContent = label;
-  zoomRange.setAttribute('aria-valuetext', label);
+  updateZoomLayout();
   lastImage = null;
   viewRevision++;
 });
 
-let orientationRequest = 0;
+function showZoom(value) {
+  zoomRange.value = String(value);
+  const label = `${value.toFixed(1)}×`;
+  zoomValue.textContent = label;
+  zoomToggle.textContent = label;
+  zoomRange.setAttribute('aria-valuetext', label);
+}
+
+zoomToggle.addEventListener('click', () => {
+  zoomSlider.hidden = !zoomSlider.hidden;
+  zoomToggle.setAttribute('aria-expanded', String(!zoomSlider.hidden));
+  zoomToggle.setAttribute('aria-label', zoomSlider.hidden ? 'Open zoom slider' : 'Close zoom slider');
+});
+
+function applyDigitalZoom(value) {
+  digitalZoom = activeLens === 'ultra' ? value / 0.5 : value;
+  video.style.transform = `scale(${digitalZoom})`;
+  lastImage = null;
+  viewRevision++;
+  showZoom(value);
+}
+
+async function findUltraWideCamera() {
+  try {
+    const track = video.srcObject?.getVideoTracks?.()[0];
+    const currentDeviceId = track?.getSettings?.().deviceId || null;
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cameras = devices.filter(device => device.kind === 'videoinput');
+    const ultra = cameras.find(device => /ultra[\s-]*wide/i.test(device.label));
+    if (ultra?.deviceId && currentDeviceId) {
+      ultraWideDeviceId = ultra.deviceId;
+      if (currentDeviceId === ultraWideDeviceId) {
+        activeLens = 'ultra';
+        standardDeviceId = cameras.find(device => device.deviceId !== currentDeviceId && /(?:back|rear).*camera|wide[\s-]*angle/i.test(device.label) && !/ultra[\s-]*wide/i.test(device.label))?.deviceId || null;
+      } else {
+        standardDeviceId = currentDeviceId;
+      }
+      zoomRange.min = '0.5';
+      zoomHint.hidden = true;
+    }
+  } catch (_) { /* The browser may not expose separate camera lenses. */ }
+  if (activeLens === 'ultra') applyDigitalZoom(requestedZoom);
+  else showZoom(requestedZoom);
+}
+
+async function updateZoom() {
+  if (cameraSwitching) return;
+  const lens = ultraWideDeviceId && (requestedZoom < 1 || !standardDeviceId) ? 'ultra' : 'standard';
+  if (lens === activeLens) {
+    applyDigitalZoom(requestedZoom);
+    return;
+  }
+  cameraSwitching = true;
+  lastImage = null;
+  viewRevision++;
+  const previousStream = video.srcObject;
+  let nextStream;
+  try {
+    const deviceId = lens === 'ultra' ? ultraWideDeviceId : standardDeviceId;
+    nextStream = await navigator.mediaDevices.getUserMedia({
+      video: { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false,
+    });
+    video.srcObject = nextStream;
+    await video.play();
+    previousStream?.getTracks().forEach(track => track.stop());
+    activeLens = lens;
+  } catch (_) {
+    nextStream?.getTracks().forEach(track => track.stop());
+    try {
+      if (previousStream?.getVideoTracks?.()[0]?.readyState === 'ended') {
+        const deviceId = activeLens === 'ultra' ? ultraWideDeviceId : standardDeviceId;
+        video.srcObject = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: deviceId } }, audio: false });
+      } else {
+        video.srcObject = previousStream;
+      }
+      await video.play();
+    } catch (_) {
+      scanning = false;
+      stopPolling();
+      showStatus('NEEDS ATTENTION', 'Could not restore the camera. Reload the page and start it again.');
+      cameraSwitching = false;
+      return;
+    }
+    requestedZoom = activeLens === 'ultra' ? 0.5 : 1;
+    showStatus('NEEDS ATTENTION', 'Could not switch camera lenses. Try again.');
+  } finally {
+    cameraSwitching = false;
+  }
+  await updateZoom();
+  if (pendingManualScan && !processing) {
+    pendingManualScan = false;
+    scan(true);
+  }
+}
+
+zoomRange.addEventListener('input', () => {
+  requestedZoom = Math.max(Number(zoomRange.min) || 1, Math.min(4, Number(zoomRange.value) || 1));
+  lastImage = null;
+  viewRevision++;
+  updateZoom();
+});
 
 async function requestNativeFullscreen() {
-  const request = ++orientationRequest;
   try {
     if (document.fullscreenEnabled && document.documentElement?.requestFullscreen) {
       await document.documentElement.requestFullscreen();
     }
   } catch (_) { /* The full-screen layout remains available without browser fullscreen. */ }
-  if (request !== orientationRequest || !document.body.classList.contains('focus-mode')) return;
-  try {
-    await globalThis.screen?.orientation?.lock?.('landscape');
-    if (request !== orientationRequest) globalThis.screen?.orientation?.unlock?.();
-  } catch (_) { /* Some browsers require the user to rotate the device. */ }
 }
 
 focusButton.addEventListener('click', () => {
@@ -134,8 +260,6 @@ focusButton.addEventListener('click', () => {
   setFocusMode(enabled);
   if (enabled) requestNativeFullscreen();
   else {
-    orientationRequest++;
-    try { globalThis.screen?.orientation?.unlock?.(); } catch (_) { /* Not supported by this browser. */ }
     if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
   }
 });
@@ -188,11 +312,9 @@ function imageChanged(previous, current) {
   return changed / current.length > 0.02;
 }
 
-function shouldUseVision(image, now) {
+function shouldUseVision(image) {
   if (!lastImage) return true;
-  const elapsed = now - lastOcrAt;
-  if (lastIncomplete) return elapsed >= 10000;
-  return elapsed >= 5000 && imageChanged(lastImage, image);
+  return lastIncomplete || imageChanged(lastImage, image);
 }
 
 function visibleCameraArea() {
@@ -244,14 +366,29 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 function startPolling() {
   if (pollingInterval !== null) return;
-  pollingInterval = setInterval(scan, 15000);
+  nextPollAt = Date.now() + pollingSeconds * 1000;
+  pollCountdown.hidden = false;
+  updatePollCountdown();
+  countdownInterval = setInterval(updatePollCountdown, 1000);
+  pollingInterval = setInterval(() => {
+    nextPollAt = Date.now() + pollingSeconds * 1000;
+    updatePollCountdown();
+    scan();
+  }, pollingSeconds * 1000);
   pollToggleButton.textContent = 'Stop polling';
+}
+
+function updatePollCountdown() {
+  pollCountdown.textContent = `Next: ${Math.max(0, Math.ceil((nextPollAt - Date.now()) / 1000))}s`;
 }
 
 function stopPolling() {
   if (pollingInterval === null) return;
   clearInterval(pollingInterval);
+  clearInterval(countdownInterval);
   pollingInterval = null;
+  countdownInterval = null;
+  pollCountdown.hidden = true;
   pollToggleButton.textContent = 'Start polling';
 }
 
@@ -302,6 +439,10 @@ async function askGemini(text, requestGeneration) {
 
 async function scan(force = false) {
   if (!scanning) return;
+  if (cameraSwitching) {
+    if (force) pendingManualScan = true;
+    return;
+  }
   if (processing) {
     if (force) {
       pendingManualScan = true;
@@ -315,8 +456,7 @@ async function scan(force = false) {
   }
   const area = visibleCameraArea();
   const image = frameFingerprint(area);
-  const now = Date.now();
-  if (!force && !shouldUseVision(image, now)) return;
+  if (!force && !shouldUseVision(image)) return;
   const sceneChanged = lastImage && imageChanged(lastImage, image);
   if (sceneChanged && currentText) {
     answers.replaceChildren();
@@ -325,7 +465,6 @@ async function scan(force = false) {
     showStatus('SCANNING', 'Connecting to Google Vision…');
   }
   lastImage = image;
-  lastOcrAt = now;
   processing = true;
   const snapshotRevision = viewRevision;
   logEvent('ocr_started');
@@ -440,10 +579,11 @@ startButton.addEventListener('click', async () => {
     scanNowButton.hidden = false;
     pollToggleButton.hidden = false;
     pollToggleButton.textContent = 'Start polling';
-    zoomToggle.hidden = false;
+    zoomControl.hidden = false;
     startButton.textContent = 'Camera is running';
     document.body.classList.add('running');
     showStatus('POLLING OFF', 'Tap Start polling or Scan now when you are ready.');
+    await findUltraWideCamera();
   } catch (error) {
     logEvent('camera_error');
     video.srcObject?.getTracks().forEach(track => track.stop());
