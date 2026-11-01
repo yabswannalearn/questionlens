@@ -81,6 +81,13 @@ function setup(fetchImpl, useVisionGate = false, ocrImpl = null, savedSettings =
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
 
+test('shows the selected letter alongside a single answer', () => {
+  const app = setup(() => {});
+  app.run(`renderAnswer({choices: [{position: 'B', text: 'The best answer'}]})`);
+  assert.equal(app.elements.answers.children[0].children[0].textContent, 'B');
+  assert.equal(app.elements.answers.children[0].children[1].textContent, 'The best answer');
+});
+
 test('shows multiple selected letters together and keeps each answer text', () => {
   const app = setup(() => {});
   app.run(`renderAnswer({choices: [

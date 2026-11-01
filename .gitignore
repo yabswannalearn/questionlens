@@ -1,4 +1,5 @@
 .venv/
+.fastapicloud/
 __pycache__/
 *.py[cod]
 .env

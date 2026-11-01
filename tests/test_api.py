@@ -1,4 +1,5 @@
 import os
+import base64
 import json
 import sqlite3
 import tempfile
@@ -31,6 +32,27 @@ class AnswerApiTests(unittest.TestCase):
         self.assertIn('GEMINI_API_KEY', response.json()['detail'])
         with closing(sqlite3.connect(self.db_path)) as db:
             self.assertEqual(db.execute('SELECT question, status FROM scans').fetchone(), (self.question['text'], 'failed'))
+
+    @patch.dict(os.environ, {'FASTAPICLOUD_DEPLOYMENT_ID': 'test'}, clear=True)
+    def test_cloud_fails_closed_without_password(self):
+        self.assertEqual(self.client.get('/').status_code, 503)
+
+    @patch.dict(os.environ, {'FASTAPICLOUD_DEPLOYMENT_ID': 'test', 'QUESTIONLENS_CLOUD_PASSWORD': 'test-secret'}, clear=True)
+    def test_cloud_requires_authentication_for_api_and_page(self):
+        self.assertEqual(self.client.get('/').status_code, 401)
+        self.assertEqual(self.client.post('/api/ocr', json={'image': 'dGVzdA=='}).status_code, 401)
+        self.assertEqual(self.client.get('/', auth=('questionlens', 'wrong')).status_code, 401)
+        self.assertEqual(self.client.get('/', auth=('questionlens', 'test-secret')).status_code, 200)
+
+    @patch.dict(os.environ, {'GOOGLE_VISION_CREDENTIALS_BASE64': base64.b64encode(b'{}').decode()}, clear=True)
+    @patch('app.cloud_vision_credentials')
+    @patch('app.AuthorizedSession')
+    def test_ocr_uses_cloud_credentials(self, session_class, credentials):
+        session = session_class.return_value.__enter__.return_value
+        session.post.return_value.json.return_value = {'responses': [{'fullTextAnnotation': {'text': 'Recognized'}}]}
+        response = self.client.post('/api/ocr', json={'image': 'dGVzdA=='})
+        self.assertEqual(response.json(), {'text': 'Recognized'})
+        credentials.assert_called_once_with(os.environ['GOOGLE_VISION_CREDENTIALS_BASE64'])
 
     @patch.dict(os.environ, {'GEMINI_API_KEY': 'test-key'}, clear=True)
     @patch('app.genai.Client')
@@ -65,6 +87,8 @@ class AnswerApiTests(unittest.TestCase):
         self.assertIn('first A, second B, third C, fourth D', prompt)
         self.assertIn('even when the choices on screen have no letters', prompt)
         self.assertIn('each selected answer as a separate choice', prompt)
+        self.assertIn('select exactly one best answer unless the question explicitly asks for multiple answers', prompt)
+        self.assertIn('select the requested number of choices', prompt)
 
     def test_choice_position_must_be_a_single_uppercase_letter(self):
         for invalid in ('1', 'A, B', 'a', ''):
