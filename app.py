@@ -1,8 +1,11 @@
 import os
 import base64
 import binascii
+import json
 import logging
+import secrets
 import sqlite3
+import tempfile
 import time
 from contextlib import closing
 from functools import lru_cache
@@ -10,8 +13,8 @@ from pathlib import Path
 from typing import Literal
 from uuid import UUID, uuid4
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from google import genai
 from google.auth.transport.requests import AuthorizedSession
@@ -20,10 +23,30 @@ from google.oauth2 import service_account
 from pydantic import BaseModel, Field, field_validator
 
 ROOT = Path(__file__).parent
-DB_PATH = ROOT / 'questions.sqlite3'
+DB_PATH = (Path(tempfile.gettempdir()) if os.getenv('FASTAPICLOUD_DEPLOYMENT_ID') else ROOT) / 'questions.sqlite3'
 logger = logging.getLogger('uvicorn.error')
 app = FastAPI()
 app.mount('/static', StaticFiles(directory=ROOT / 'static'), name='static')
+
+
+@app.middleware('http')
+async def protect_cloud_app(request: Request, call_next):
+    if os.getenv('FASTAPICLOUD_DEPLOYMENT_ID'):
+        password = os.getenv('QUESTIONLENS_CLOUD_PASSWORD')
+        if not password:
+            return PlainTextResponse('Cloud access is not configured.', status_code=503)
+        try:
+            scheme, encoded = request.headers.get('authorization', '').split(' ', 1)
+            credentials = base64.b64decode(encoded, validate=True).decode('utf-8')
+            username, supplied = credentials.split(':', 1)
+            authorized = (scheme.lower() == 'basic' and secrets.compare_digest(username.encode(), b'questionlens')
+                          and secrets.compare_digest(supplied.encode(), password.encode()))
+        except (ValueError, UnicodeError, binascii.Error):
+            authorized = False
+        if not authorized:
+            return PlainTextResponse('Authentication required.', status_code=401,
+                                     headers={'WWW-Authenticate': 'Basic realm="Question Lens"'})
+    return await call_next(request)
 
 
 class Question(BaseModel):
@@ -64,6 +87,14 @@ class Snapshot(BaseModel):
 def vision_credentials(path: str):
     return service_account.Credentials.from_service_account_file(
         path, scopes=['https://www.googleapis.com/auth/cloud-platform'],
+    )
+
+
+@lru_cache(maxsize=1)
+def cloud_vision_credentials(encoded: str):
+    info = json.loads(base64.b64decode(encoded, validate=True))
+    return service_account.Credentials.from_service_account_info(
+        info, scopes=['https://www.googleapis.com/auth/cloud-platform'],
     )
 
 
@@ -126,7 +157,8 @@ def phone_event(event: PhoneEvent):
 @app.post('/api/ocr')
 def ocr(snapshot: Snapshot):
     path = os.getenv('GOOGLE_VISION_KEY_PATH')
-    if not path:
+    encoded_key = os.getenv('GOOGLE_VISION_CREDENTIALS_BASE64')
+    if not path and not encoded_key:
         raise HTTPException(status_code=503, detail='Set GOOGLE_VISION_KEY_PATH in .env before starting the server.')
     try:
         base64.b64decode(snapshot.image, validate=True)
@@ -134,7 +166,8 @@ def ocr(snapshot: Snapshot):
         raise HTTPException(status_code=400, detail='Invalid camera snapshot.') from None
     logger.info('Sending camera snapshot to Google Cloud Vision.')
     try:
-        with AuthorizedSession(vision_credentials(path)) as session:
+        credentials = cloud_vision_credentials(encoded_key) if encoded_key else vision_credentials(path)
+        with AuthorizedSession(credentials) as session:
             response = session.post(
                 'https://vision.googleapis.com/v1/images:annotate', timeout=30,
                 json={'requests': [{'image': {'content': snapshot.image}, 'features': [{'type': 'TEXT_DETECTION'}]}]},
@@ -165,7 +198,9 @@ def answer(question: Question):
     prompt = (
         'Answer this English multiple-choice certification practice question. '
         'The text was read from a screen using OCR and may contain small errors. '
-        'Choose the best answer, or all requested answers if the question asks for more than one. '
+        'Most questions require one best answer. Analyze the question and compare the choices carefully, '
+        'then select exactly one best answer unless the question explicitly asks for multiple answers. '
+        'If it asks for multiple answers, select the requested number of choices. '
         'Assign letters by the order the choices appear: first A, second B, third C, fourth D, and so on, '
         'even when the choices on screen have no letters or use numbers. '
         'Return each selected answer as a separate choice, with its single uppercase letter in position '

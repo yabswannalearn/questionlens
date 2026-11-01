@@ -56,3 +56,9 @@ OCR reads the camera region visible in the preview. Keep surrounding text out of
 Exit full screen and use **View OCR reading** on the phone to inspect the latest recognized text. Selected camera snapshots are sent to the laptop and Google Cloud Vision. Screen glare, flicker, and small text can make readings inaccurate.
 
 The server is intended for your trusted local network, has no login, and makes Gemini requests using the laptop's key. Do not expose it to the public internet.
+
+## FastAPI Cloud backup
+
+The cloud copy requires the username `questionlens` and the password saved in `secrets/cloud-password.txt` on the laptop used to deploy it. The Gemini key, Vision service-account credential, and cloud password are stored as encrypted FastAPI Cloud secrets. Open the hosted HTTPS address on your phone and sign in when prompted.
+
+The cloud copy operates independently of the laptop, but its scan history is temporary and separate from the local SQLite history; it can disappear when cloud instances restart or scale down. Browser settings and the current session cache are also separate between the two addresses. Cloud hosting, Vision, and Gemini usage are subject to their respective plan limits and charges.
